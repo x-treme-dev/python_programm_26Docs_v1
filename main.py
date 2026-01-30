@@ -24,9 +24,6 @@ params = [
     ["ОСП по Центральному району г. Симферополя", "Отделение судебных приставов по Центральному району г. Симферополя", "Центральный_ОСП"]
 ]
 
-list_dir_temp = []
-old_filename = []
-
 def finish():
     root.destroy()
     print("Closing app")
@@ -69,15 +66,11 @@ def copy_files(path_source, path_target, search_str1, search_str2, folder_name):
     #временная директория для скопированных файлов 
     new_path_temp = os.path.join(path_target + '\\temp', folder_name)
     os.makedirs(new_path_temp, exist_ok=True)
-    # Очищаем список перед началом
-    global list_dir_temp
     for root, dirs, files in os.walk(path_source):
         for file in files:
             if file.lower().endswith('.pdf'):
                 full_path = os.path.join(root, file)
-                if new_path_temp not in list_dir_temp:
-                    #list_dir_temp.append(new_path_temp)
-                    try:
+                try:
                         reader = PdfReader(full_path)
                         text = ""
                         for page in reader.pages:
@@ -85,9 +78,9 @@ def copy_files(path_source, path_target, search_str1, search_str2, folder_name):
                         if search_str1 in text or search_str2 in text:
                             shutil.copy2(full_path, new_path_temp)
                             print(f"Файл скопирован: {full_path} -> {new_path_temp}")
-                    except Exception as e:
+                except Exception as e:
                         print(f"Ошибка при обработке файла {full_path}: {e}")
-    # Можно оставить или убрать вывод
+        lb_message.configure(text='Файлы отсортированы!')
    
 def remove_dir_temp(path_target):
     # Правильно формируем путь, используя Path
