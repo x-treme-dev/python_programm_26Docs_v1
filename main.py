@@ -35,7 +35,7 @@ search_strings = [
     ["Постановление об объединении ИП", "ПОСТ_об_объед_ИП"],
     ["Постановление о снятии ареста", "ПОСТ_о_снятии_ареста"],
     ["Постановление об отмене постановления", "ПОСТ_об_отмене_пост"],
-    ["ИЗВЕЩЕНИЕ о возвращении исполнительного документа в орган", "ИЗВЕЩЕНИЕ"]
+    ["ИЗВЕЩЕНИЕ", "ИЗВЕЩЕНИЕ"]
 ]
 
 
@@ -126,7 +126,7 @@ def remove_dir_temp(path_target_list):
 
 def extract_sudebny_prikaz(text):
     # Ищем вариации 'Судебный приказ' или 'c судебным приказом'
-    pattern = r'(Судебный приказ|судебный приказ|c судебным приказом|по делу)(.*?)(выданный органом|,|предмет исполнения)'
+    pattern = r'(Судебный приказ|судебный приказ|c судебным приказом|по делу)(.*?)(выданный органом|,|предмет исполнения|,|вступившему в законную силу)'
     match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
     if match:
         # Берем все символы между найденными фразами
@@ -136,44 +136,53 @@ def extract_sudebny_prikaz(text):
         return part
     return None
 
-# Прочитать файл по-странично, получить текст и сопоставить с шаблоном из словаря
-def find_string_in_pdf(pdf_path, search_string):
-    global text
-    try:
-        reader = PdfReader(pdf_path)
-        for page_num, page in enumerate(reader.pages):
-            text = page.extract_text()
-            if text and search_string in text:
-                return True
-        return False
-    except Exception as e:
-        print(f"Ошибка при чтении файла {pdf_path}: {e}")
-        return False
+def sanitize_filename(name):
+    # Заменяем недопустимые символы на _
+    name = re.sub(r'[\\/:*?"<>|]', '_', name)
+    # Удаляем управляющие символы, например, переносы строк
+    name = re.sub(r'[\n\r\t]', '', name)
+    # Убираем лишние пробелы
+    name = name.strip()
+    # Удаляем запятую, если она есть в конце
+    name = re.sub(r',\s*$', '', name)
+    # Удаляем нижнее подчеркивание и ноль, если они идут в конце
+    name = re.sub(r'(_0)$', '', name)
+    return name
+
 
 # Сформировать строку с именем и переименовать найденный файл при условии совпадения со словарем
 def rename_files(path_target, search_str, cat_string):
-    global text
-    form_path_target = Path(path_target)
-    #найти в указанной директории файлы с совпадениями
+    new_path = None
+    print(f'Обход директории: {path_target}')
     for root, dirs, files in os.walk(path_target):
-        for file in files:
-            if file.lower().endswith('.pdf'):
-                #получить абсолютный путь к файлу
-                pdf_path = os.path.join(root, file)
-                if find_string_in_pdf(pdf_path, search_str):
-                    #print(f"Найдено в файле: {pdf_path}")
-                    temp_string = cat_string
-                    if extract_sudebny_prikaz(text):
-                        temp_string = temp_string + '_' + extract_sudebny_prikaz(text)
-                        print(f'temp_string is {temp_string}')
-                    else:
-                        temp_string = temp_string + '_none'
-                      
-   
-    
-        
-    
- 
+        for filename in files:
+            #print(f"Обрабатываем файл: {filename}") 
+            if filename.lower().endswith('.pdf'):
+                file_path = os.path.join(root, filename)
+                #print(f"Обрабатываем PDF-файл: {file_path}")
+                try:
+                    with open(file_path, 'rb') as f:
+                        reader = PdfReader(f)
+                        text_found = False
+                        for page in reader.pages:
+                            text = page.extract_text()
+                            if text and search_str.lower() in text.lower():
+                                #print(f"search_srt={search_str}")
+                                #print(f"Совпадение найдено в файле: {filename}")
+                                sudebny_prikaz = extract_sudebny_prikaz(text) or ''
+                                new_name = sanitize_filename(cat_string + '_' + sudebny_prikaz + '.pdf') 
+                                new_path = os.path.join(os.path.split(file_path)[0], new_name)
+                                #print(f"new_name={new_name}")
+                                text_found = True
+                                break
+                    if new_path and not os.path.exists(new_path):
+                        os.rename(file_path, new_path)
+                        print(f'Переименовано: {new_path}')
+                except Exception as e:
+                    print(f"Ошибка при чтении файла {filename}: {e}")
+
+                             
+                       
 ################# interface ##########################################################           
 # Создаем главное окно
 root = Tk()
