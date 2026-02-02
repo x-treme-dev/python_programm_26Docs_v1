@@ -17,6 +17,7 @@ from pathlib import Path
 path_source = 'C:\\Users\\user\\WORK\\WorkingProjects\\Michaylov\\files_for_sorting' #del
 path_target = 'C:\\Users\\user\\WORK\\WorkingProjects\\Michaylov\\ResultsProgram'  #del
 path_target_list = []
+text = ''
 
 params = [
     ["ОСП по Киевскому району г. Симферополя", "Отделение судебных приставов по Киевскому району г. Симферополя", "Киевский_ОСП"],
@@ -36,8 +37,6 @@ search_strings = [
     ["Постановление об отмене постановления", "ПОСТ_об_отмене_пост"],
     ["ИЗВЕЩЕНИЕ о возвращении исполнительного документа в орган", "ИЗВЕЩЕНИЕ"]
 ]
-
-prikaz_pattern = r'(Судебный приказ|судебный приказ|c судебным приказом|по делу)(.*?)(выданный органом|,|предмет исполнения)'
 
 
 
@@ -133,13 +132,13 @@ def extract_sudebny_prikaz(text):
         # Берем все символы между найденными фразами
         part = match.group(2).strip()
         # Удаляем переносы строк, табуляции, запятые и кириллические символы
-        part = re.sub(r'[\n\r\t,а-яА-Я]', '', part).strip()
+        part = re.sub(r'[\n\r\t,(4\),а-яА-Я]', '', part).strip().replace(' ', '_')
         return part
     return None
 
-
-def find_string_in_pdf(pdf_path, search_string, cat_string):
-    #прочитать файл по-странично, получить текст
+# Прочитать файл по-странично, получить текст и сопоставить с шаблоном из словаря
+def find_string_in_pdf(pdf_path, search_string):
+    global text
     try:
         reader = PdfReader(pdf_path)
         for page_num, page in enumerate(reader.pages):
@@ -151,7 +150,9 @@ def find_string_in_pdf(pdf_path, search_string, cat_string):
         print(f"Ошибка при чтении файла {pdf_path}: {e}")
         return False
 
+# Сформировать строку с именем и переименовать найденный файл при условии совпадения со словарем
 def rename_files(path_target, search_str, cat_string):
+    global text
     form_path_target = Path(path_target)
     #найти в указанной директории файлы с совпадениями
     for root, dirs, files in os.walk(path_target):
@@ -159,8 +160,15 @@ def rename_files(path_target, search_str, cat_string):
             if file.lower().endswith('.pdf'):
                 #получить абсолютный путь к файлу
                 pdf_path = os.path.join(root, file)
-                if find_string_in_pdf(pdf_path, search_str, cat_string):
-                    print(f"Найдено в файле: {pdf_path}")
+                if find_string_in_pdf(pdf_path, search_str):
+                    #print(f"Найдено в файле: {pdf_path}")
+                    temp_string = cat_string
+                    if extract_sudebny_prikaz(text):
+                        temp_string = temp_string + '_' + extract_sudebny_prikaz(text)
+                        print(f'temp_string is {temp_string}')
+                    else:
+                        temp_string = temp_string + '_none'
+                      
    
     
         
