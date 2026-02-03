@@ -34,8 +34,16 @@ search_strings = [
     ["Постановление об обращении взыскания на денежные средства", "ПОСТ_об_обращ_взыскан_на_ден_средства"],
     ["Постановление об объединении ИП", "ПОСТ_об_объед_ИП"],
     ["Постановление о снятии ареста", "ПОСТ_о_снятии_ареста"],
-    ["Постановление об отмене постановления", "ПОСТ_об_отмене_пост"],
+    ["Постановление об отмене постановления об обращении взыскания на ДС", "ПОСТ_об_отмене_пост"],
     ["ИЗВЕЩЕНИЕ", "ИЗВЕЩЕНИЕ"]
+]
+
+prikazy = [
+    ["Судебный приказ", "выданный органом: Судебный участок мирового судьи"],
+    ["Судебный приказ", "выданный органом: Судебный участок"],
+    ["Судебный приказ", "выданный органом Судебный участок"],
+    ["cудебный приказ", "выданный органом Судебный участок"],
+    ["cудебный приказ", "выданный органом: Судебный участок"], 
 ]
 
 
@@ -133,16 +141,19 @@ def clean_string(s):
        
 
 def extract_sudebny_prikaz(text):
-    # Ищем вариации 'Судебный приказ' или 'c судебным приказом'
-    pattern = r'(Судебный приказ|судебный приказ|c судебным приказом|по делу)(.*?)(выданный органом|,|предмет исполнения|,|вступившему в законную силу)'
-    match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
-    if match:
-        # Берем все символы между найденными фразами
-        part = match.group(2).strip()
-        # Удаляем переносы строк, табуляции, запятые и кириллические символы
-        part = re.sub(r'[\n\r\t,(4\),а-яА-Я]', '', part).strip().replace(' ', '_')
-        return part
-    return None
+      pattern = r'№?\s*(\d{1,2}(?:-\d{1,4}){1,2}/\d{1,4}(?:/\d{1,4})?)\s*от\s*(\d{2}\.\d{2}\.\d{4})'
+      match = re.search(pattern, text, re.IGNORECASE | re.DOTALL | re.MULTILINE)
+      if match:
+            part = match.group(1).strip()
+            date = match.group(2).strip()
+            # Очистка номера
+            part = re.sub(r'[\n\r\t,(4\),а-яА-Я]', '', part).strip().replace(' ', '_')
+            return part, date
+      return None, None
+
+
+
+    
 
 def sanitize_filename(name):
     # Заменяем недопустимые символы на _
@@ -157,6 +168,11 @@ def sanitize_filename(name):
     name = re.sub(r'(_0)$', '', name)
     return name
 
+def normalize_text(s):
+    s = s.lower()
+    s = re.sub(r'[^a-zа-я0-9\s]', '', s)  # Удаление спецсимволов
+    s = re.sub(r'\s+', ' ', s).strip()    # Лишние пробелы
+    return s
 
 # Сформировать строку с именем и переименовать найденный файл при условии совпадения со словарем
 def rename_files(path_target, search_str, cat_string):
@@ -166,19 +182,25 @@ def rename_files(path_target, search_str, cat_string):
         for filename in files:
             if filename.lower().endswith('.pdf'):
                 file_path = os.path.join(root, filename)
+                # если файл перименован (с особой меткой), то пропускаем
+                if '_re' in filename:
+                    continue  # пропускаем файлы, которые уже содержат маркер переименования
                 try:
                     with open(file_path, 'rb') as f:
                         reader = PdfReader(f)
                         text_found = False
+                        text = None
                         for page in reader.pages:
-                            text = page.extract_text()
-                            if text and search_str.lower() in text.lower():
-                                #print(f"clean_string={clean_string(search_str.lower())}, clean_string(text.lower()) {clean_string(text.lower())}")
-        
-                                sudebny_prikaz = extract_sudebny_prikaz(text) or ''
-                                new_name = sanitize_filename(cat_string + '_' + sudebny_prikaz + '.pdf') 
-                                new_path = os.path.join(os.path.split(file_path)[0], new_name)
-                                text_found = True
+                            text = page.extract_text() or ""
+                            normalized_text = normalize_text(text)
+                            normalized_search_str = normalize_text(search_str)
+                            if normalized_search_str in normalized_text:
+                                part, date = extract_sudebny_prikaz(text) or ''
+                                if part and date:
+                                    sudebny_prikaz =f"_{part}_{date}"
+                                    new_name = sanitize_filename(cat_string + '_' + sudebny_prikaz + '_re' + '.pdf') 
+                                    new_path = os.path.join(os.path.split(file_path)[0], new_name)
+                                    text_found = True
                                 break
                     if new_path and not os.path.exists(new_path):
                         os.rename(file_path, new_path)
