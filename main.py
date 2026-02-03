@@ -30,7 +30,7 @@ search_strings = [
     ["Постановление о возбуждении исполнительного производства", "ПОСТ_о_возб"],
     ["Постановление об окончании исполнительного производства", "ПОСТ_об_оконч"],
     ["Постановление об окончании и возвращении ИД взыскателю", "ПОСТ об оконч и возвр ИД"],
-    ["Постановление об временном ограничении на выезд", "ПОСТ_об_врем_огран_на_выезд"],
+    ["Постановление о временном ограничении на выезд", "ПОСТ_об_врем_огран_на_выезд"],
     ["Постановление об обращении взыскания на денежные средства", "ПОСТ_об_обращ_взыскан_на_ден_средства"],
     ["Постановление об объединении ИП", "ПОСТ_об_объед_ИП"],
     ["Постановление о снятии ареста", "ПОСТ_о_снятии_ареста"],
@@ -122,7 +122,15 @@ def remove_dir_temp(path_target_list):
                 lb_message.configure(text='Файлы уже удалены!')
     else:
         lb_message.configure(text='Нет файлов для удаления!')
-        
+
+def clean_string(s):
+    # Удаляет все символы, кроме букв, цифр и пробелов
+    s = re.sub(r'[^A-Za-zА-Яа-я0-9\s]', '', s)
+    # Удаляет лишние пробелы и переводит в нижний регистр
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s      
+    
+       
 
 def extract_sudebny_prikaz(text):
     # Ищем вариации 'Судебный приказ' или 'c судебным приказом'
@@ -156,10 +164,8 @@ def rename_files(path_target, search_str, cat_string):
     print(f'Обход директории: {path_target}')
     for root, dirs, files in os.walk(path_target):
         for filename in files:
-            #print(f"Обрабатываем файл: {filename}") 
             if filename.lower().endswith('.pdf'):
                 file_path = os.path.join(root, filename)
-                #print(f"Обрабатываем PDF-файл: {file_path}")
                 try:
                     with open(file_path, 'rb') as f:
                         reader = PdfReader(f)
@@ -167,12 +173,11 @@ def rename_files(path_target, search_str, cat_string):
                         for page in reader.pages:
                             text = page.extract_text()
                             if text and search_str.lower() in text.lower():
-                                #print(f"search_srt={search_str}")
-                                #print(f"Совпадение найдено в файле: {filename}")
+                                #print(f"clean_string={clean_string(search_str.lower())}, clean_string(text.lower()) {clean_string(text.lower())}")
+        
                                 sudebny_prikaz = extract_sudebny_prikaz(text) or ''
                                 new_name = sanitize_filename(cat_string + '_' + sudebny_prikaz + '.pdf') 
                                 new_path = os.path.join(os.path.split(file_path)[0], new_name)
-                                #print(f"new_name={new_name}")
                                 text_found = True
                                 break
                     if new_path and not os.path.exists(new_path):
