@@ -3,9 +3,8 @@ import pdfplumber
 import re
 import hashlib
 import random
-import PyPDF2
 import shutil
-import time
+
 
 from tkinter import *
 from tkinter import ttk
@@ -83,24 +82,36 @@ def get_directory(param):
 
 def check_values(path_source, path_target):
     if path_source == '' or path_target == '':
-        lb_message.config(text = 'Недостаточно данных поиска!')
+        lb_message.config(text = 'Недостаточно данных поиска!', foreground="red")
         print('Недостаточно данных для поиска!')
     else:
-       #find_files(path_source)
-        
+        # Проверяем наличие PDF файлов в исходной папке
+        files_found = False
+        for root_dir, dirs, files in os.walk(path_source):
+            for file in files:
+                if file.lower().endswith('.pdf'):
+                    files_found = True
+                    break
+            if files_found:
+                break
+
+        if not files_found:
+            lb_message.config(text='В выбранной папке нет PDF-файлов!', foreground="red")
+            print('В выбранной папке нет PDF-файлов!')
+            return  # Выходим, чтобы не выполнять дальнейшие действия
+
         for p in params:
-            copy_files(path_source, path_target, *p)
-        # rename after sorting
+             copy_files(path_source, path_target, *p)
+            # rename after sorting
         global f_str
         for s in search_strings:
-            rename_files(path_target, *s)
+             rename_files(path_target, *s)
         
 
 def copy_files(path_source, path_target, search_str1, search_str2, folder_name):
     #временная директория для скопированных файлов
     global path_target_list
     new_path_temp = os.path.join(path_target, folder_name)
-    lb_message.configure(text='Копирование...') 
     for root, dirs, files in os.walk(path_source):
         for file in files:
             if file.lower().endswith('.pdf'):
@@ -199,7 +210,7 @@ def rename_files(path_target, search_str, cat_string):
                                 print(f'Переименовано: {new_path}')
                 except Exception as e:
                         print(f"Ошибка при чтении файла {filename}: {e}")
-        lb_message.configure(text='Файлы отсортированы и переименованы!')                     
+    lb_message.configure(text='Файлы отсортированы и переименованы!',  foreground="green")                     
                        
 ################# interface ##########################################################           
 # Создаем главное окно
