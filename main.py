@@ -1,23 +1,26 @@
 import os
-from tkinter import *
-from tkinter import ttk
-import tkinter as tk
-from tkinter import filedialog
-import shutil
-from PyPDF2 import PdfReader
+import pdfplumber
 import re
 import hashlib
 import random
 import PyPDF2
+import shutil
+import time
+
+from tkinter import *
+from tkinter import ttk
+import tkinter as tk
+from tkinter import filedialog
+from PyPDF2 import PdfReader
 from pathlib import Path
 
-#path_source = ''
-#path_target = ''
+path_source = ''
+path_target = ''
 
-path_source = 'C:\\Users\\user\\WORK\\WorkingProjects\\Michaylov\\files_for_sorting' #del
-path_target = 'C:\\Users\\user\\WORK\\WorkingProjects\\Michaylov\\ResultsProgram'  #del
-path_target_list = []
-text = ''
+#path_source = 'C:\\Users\\user\\WORK\\WorkingProjects\\Michaylov\\files_for_sorting' #del
+#path_target = 'C:\\Users\\user\\WORK\\WorkingProjects\\Michaylov\\ResultsProgram'  #del
+ 
+ 
 
 params = [
     ["ОСП по Киевскому району г. Симферополя", "Отделение судебных приставов по Киевскому району г. Симферополя", "Киевский_ОСП"],
@@ -25,6 +28,7 @@ params = [
     ["ОСП по Симферопольскому району г. Симферополя", "Отделение судебных приставов по Симферопольскому району г. Симферополя", "Симф_р-н_ОСП"],
     ["ОСП по Центральному району г. Симферополя", "Отделение судебных приставов по Центральному району г. Симферополя", "Центральный_ОСП"]
 ]
+
 
 search_strings = [
     ["Постановление о возбуждении исполнительного производства", "ПОСТ_о_возб"],
@@ -35,8 +39,9 @@ search_strings = [
     ["Постановление об объединении ИП", "ПОСТ_об_объед_ИП"],
     ["Постановление о снятии ареста", "ПОСТ_о_снятии_ареста"],
     ["Постановление об отмене постановления об обращении взыскания на ДС", "ПОСТ_об_отмене_пост"],
-    ["ИЗВЕЩЕНИЕ", "ИЗВЕЩЕНИЕ"]
+    ["ИЗВЕЩЕНИЕ о возвращении исполнительного документа", "ИЗВЕЩЕНИЕ"],
 ]
+
 
 prikazy = [
     ["Судебный приказ", "выданный органом: Судебный участок мирового судьи"],
@@ -89,14 +94,13 @@ def check_values(path_source, path_target):
         global f_str
         for s in search_strings:
             rename_files(path_target, *s)
+        
 
 def copy_files(path_source, path_target, search_str1, search_str2, folder_name):
     #временная директория для скопированных файлов
     global path_target_list
     new_path_temp = os.path.join(path_target, folder_name)
-   
-    path_target_list.append(new_path_temp)
-    os.makedirs(new_path_temp, exist_ok=True)
+    lb_message.configure(text='Копирование...') 
     for root, dirs, files in os.walk(path_source):
         for file in files:
             if file.lower().endswith('.pdf'):
@@ -107,29 +111,14 @@ def copy_files(path_source, path_target, search_str1, search_str2, folder_name):
                         for page in reader.pages:
                             text += page.extract_text() or ""
                         if search_str1 in text or search_str2 in text:
+                            os.makedirs(new_path_temp, exist_ok=True)
                             shutil.copy2(full_path, new_path_temp)
                             print(f"Файл скопирован: {full_path} -> {new_path_temp}")
                 except Exception as e:
                         print(f"Ошибка при обработке файла {full_path}: {e}")
-        lb_message.configure(text='Файлы отсортированы!')
-
-'''
-    for item in path_target_list:
-        print(f'path_target_list is {item}')
-'''      
-   
-def remove_dir_temp(path_target_list):
-    if path_target_list:
-        for item in path_target_list:
-            try:
-                shutil.rmtree(item)
-                print(f"Директория {item} успешно удалена.")
-                lb_message.configure(text='Файлы удалены!')
-            except Exception as e:
-                print(f"Не удалось удалить директорию {dir_temp}. Ошибка: {e}")
-                lb_message.configure(text='Файлы уже удалены!')
-    else:
-        lb_message.configure(text='Нет файлов для удаления!')
+        
+  
+ 
 
 def clean_string(s):
     # Удаляет все символы, кроме букв, цифр и пробелов
@@ -137,11 +126,10 @@ def clean_string(s):
     # Удаляет лишние пробелы и переводит в нижний регистр
     s = re.sub(r'\s+', ' ', s).strip()
     return s      
-    
-       
-
+          
 def extract_sudebny_prikaz(text):
-      pattern = r'№?\s*(\d{1,2}(?:-\d{1,4}){1,2}/\d{1,4}(?:/\d{1,4})?)\s*от\s*(\d{2}\.\d{2}\.\d{4})'
+      #pattern = r'№?\s*(\d{1,2}(?:-\d{1,4}){1,2}/\d{1,4}(?:/\d{1,4})?)\s*от\s*(\d{2}\.\d{2}\.\d{4})'
+      pattern = r'№?\s*(\d{1,2}(?:-\d{1,4}){1,2}/\d{1,4}(?:/\d{1,4})?)\s*[\,]?\s*.*?(\d{2}\.\d{2}\.\d{4})'
       match = re.search(pattern, text, re.IGNORECASE | re.DOTALL | re.MULTILINE)
       if match:
             part = match.group(1).strip()
@@ -150,10 +138,6 @@ def extract_sudebny_prikaz(text):
             part = re.sub(r'[\n\r\t,(4\),а-яА-Я]', '', part).strip().replace(' ', '_')
             return part, date
       return None, None
-
-
-
-    
 
 def sanitize_filename(name):
     # Заменяем недопустимые символы на _
@@ -168,53 +152,60 @@ def sanitize_filename(name):
     name = re.sub(r'(_0)$', '', name)
     return name
 
-def normalize_text(s):
-    s = s.lower()
-    s = re.sub(r'[^a-zа-я0-9\s]', '', s)  # Удаление спецсимволов
-    s = re.sub(r'\s+', ' ', s).strip()    # Лишние пробелы
-    return s
+
+def find_matches(text, search_str):
+    matched = []
+    # Создаем паттерн, заменяя пробелы на \s* для игнорирования переносов и пробелов
+    pattern = r'\s*'.join(re.escape(word) for word in search_str.split())
+    # Ищем совпадение с учетом переносов и пробелов
+    if re.search(pattern, text, re.IGNORECASE | re.DOTALL):
+        matched.append("Найдено!") 
+    return matched 
 
 # Сформировать строку с именем и переименовать найденный файл при условии совпадения со словарем
 def rename_files(path_target, search_str, cat_string):
     new_path = None
-    print(f'Обход директории: {path_target}')
     for root, dirs, files in os.walk(path_target):
+        print(f'Обход директории: {path_target}')
         for filename in files:
             if filename.lower().endswith('.pdf'):
                 file_path = os.path.join(root, filename)
-                # если файл перименован (с особой меткой), то пропускаем
                 if '_re' in filename:
-                    continue  # пропускаем файлы, которые уже содержат маркер переименования
+                    continue  # пропускаем уже переименованные файлы
                 try:
-                    with open(file_path, 'rb') as f:
-                        reader = PdfReader(f)
+                    with pdfplumber.open(file_path) as pdf:
                         text_found = False
-                        text = None
-                        for page in reader.pages:
-                            text = page.extract_text() or ""
-                            normalized_text = normalize_text(text)
-                            normalized_search_str = normalize_text(search_str)
-                            if normalized_search_str in normalized_text:
-                                part, date = extract_sudebny_prikaz(text) or ''
-                                if part and date:
-                                    sudebny_prikaz =f"_{part}_{date}"
-                                    new_name = sanitize_filename(cat_string + '_' + sudebny_prikaz + '_re' + '.pdf') 
-                                    new_path = os.path.join(os.path.split(file_path)[0], new_name)
-                                    text_found = True
-                                break
-                    if new_path and not os.path.exists(new_path):
-                        os.rename(file_path, new_path)
-                        print(f'Переименовано: {new_path}')
+                        text = ""
+                        for page in pdf.pages:
+                            page_text = page.extract_text() or ""
+                            text += page_text + "\n"
+                    print(f"Шаблон для поиска: {search_str}")
+                    print(f"Путь к файлу: {file_path}")
+                    matches = find_matches(text, search_str)
+                    print(f"Результат: {matches}")
+                    if matches:
+                        print("Совпадения найдены, обрабатываю...")
+                        #for item in matches:
+                            #print(f"matches={item}")
+                        part, date = extract_sudebny_prikaz(text) or ('', '')
+                        #print(f"part={part}, date={date}")
+                        if part and date:
+                            sudebny_prikaz = f"_{part}_{date}"
+                            new_name = sanitize_filename(cat_string + '_' + sudebny_prikaz + '_re' + '.pdf')
+                            new_path = os.path.join(os.path.split(file_path)[0], new_name)
+                            # переименовываем только в случае, если такого имени в директории нет
+                            if not os.path.exists(new_path):
+                                os.rename(file_path, new_path)
+                                print(f'Переименовано: {new_path}')
                 except Exception as e:
-                    print(f"Ошибка при чтении файла {filename}: {e}")
-
-                             
+                        print(f"Ошибка при чтении файла {filename}: {e}")
+        lb_message.configure(text='Файлы отсортированы и переименованы!')                     
                        
 ################# interface ##########################################################           
 # Создаем главное окно
 root = Tk()
 root.title("26Docs")
-root.geometry("600x350+500+200")
+root.geometry("700x350+500+200")
 root.update_idletasks()
 
 
@@ -251,7 +242,7 @@ mainframe.grid_columnconfigure(2, weight=1)
 ttk.Button(mainframe, text='Сортировать', command=lambda:check_values(path_source, path_target)).grid(column=1, row=5, columnspan=2, sticky=(W, E))
 lb_message = ttk.Label(mainframe, text='')
 lb_message.grid(column=1, row=6, columnspan=2, sticky=(W, E))
-ttk.Button(mainframe, text='Удалить исходные файлы', command=lambda:remove_dir_temp(path_target_list)).grid(column=1, row=7, columnspan=2, sticky=(W, E))
+ 
  
 
 for child in mainframe.winfo_children():
